@@ -240,6 +240,35 @@
     .bm-err { color: var(--err); font-size: 12px; margin-bottom: 8px; display: none; }
     .bm-ok { color: var(--teal); font-size: 12px; margin-bottom: 8px; display: none; }
 
+    /* Lab PDF upload */
+    .lab-upload {
+      margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--rule-soft);
+    }
+    .lab-upload .lu-label {
+      font-size: 13px; color: var(--fg); margin-bottom: 3px;
+    }
+    .lab-upload .lu-sub { font-size: 11.5px; color: var(--muted); margin-bottom: 10px; }
+    .lu-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .lu-row input[type=file] {
+      flex: 1; min-width: 180px; font-size: 12px; color: var(--fg-2);
+      background: var(--bg-3); border: 1px solid var(--rule);
+      border-radius: 7px; padding: 7px 9px;
+    }
+    .lu-row input[type=file]::file-selector-button {
+      font-family: inherit; font-size: 12px; cursor: pointer;
+      background: var(--bg-2); color: var(--fg-2);
+      border: 1px solid var(--rule); border-radius: 6px;
+      padding: 5px 9px; margin-right: 10px;
+    }
+    .lu-status {
+      margin-top: 10px; font-family: 'DM Mono', monospace; font-size: 12px;
+      display: none;
+    }
+    .lu-status.show { display: block; }
+    .lu-status.working { color: var(--gold-2); }
+    .lu-status.done { color: var(--teal); }
+    .lu-status.err { color: var(--err); }
+
     .marker-block { margin-bottom: 18px; }
     .marker-block:last-child { margin-bottom: 0; }
     .marker-head {
@@ -463,6 +492,17 @@
           </div>
           <div class="bm-err" id="bmErr"></div>
           <div class="bm-ok" id="bmOk">Value added.</div>
+
+          <!-- Lab report PDF upload -->
+          <div class="lab-upload">
+            <div class="lu-label">Upload lab report (PDF)</div>
+            <div class="lu-sub">Upload a lab report and NOMOI reads every result line into this patient's biomarkers. Manual entry above still works for one-off values.</div>
+            <div class="lu-row">
+              <input type="file" id="labFile" accept="application/pdf,.pdf" />
+              <button class="btn btn-gold" id="labUploadBtn">Read lab report</button>
+            </div>
+            <div class="lu-status" id="labStatus"></div>
+          </div>
         </div>
 
         <!-- Biomarker charts -->

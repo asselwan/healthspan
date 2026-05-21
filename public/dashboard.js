@@ -264,6 +264,11 @@
     // Default the date fields to today.
     document.getElementById('bmDate').value = todayISO();
     document.getElementById('cwDate').value = current.cognitive_wellness_dated_on || todayISO();
+
+    // Reset the lab upload control so a prior patient's state does not linger.
+    var labFile = document.getElementById('labFile');
+    if (labFile) labFile.value = '';
+    clearLabStatus();
   }
 
   function renderPatientHead() {
@@ -594,6 +599,128 @@
         btn.disabled = false; btn.textContent = 'Add value';
       });
   });
+
+  /* ---- Lab report PDF upload + extraction --------------------------- */
+  // The clinician picks a lab PDF. It is uploaded to the healthspan-labs
+  // Storage bucket using the same service-role key that opened this tab,
+  // then the NOMOI document-extraction backend reads it and writes the
+  // biomarker rows. We then refresh the patient's biomarker view.
+  var LABS_BUCKET = CFG.LABS_BUCKET || 'healthspan-labs';
+
+  function setLabStatus(kind, msg) {
+    var el = document.getElementById('labStatus');
+    el.className = 'lu-status show ' + kind;
+    el.textContent = msg;
+  }
+  function clearLabStatus() {
+    var el = document.getElementById('labStatus');
+    el.className = 'lu-status';
+    el.textContent = '';
+  }
+
+  document.getElementById('labUploadBtn').addEventListener('click', function () {
+    var btn = document.getElementById('labUploadBtn');
+    var fileInput = document.getElementById('labFile');
+
+    if (!current) {
+      setLabStatus('err', 'Select a patient before uploading a lab report.');
+      return;
+    }
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) {
+      setLabStatus('err', 'Choose a PDF lab report first.');
+      return;
+    }
+    var name = (file.name || '').toLowerCase();
+    var isPdf = file.type === 'application/pdf' || /\.pdf$/.test(name);
+    if (!isPdf) {
+      setLabStatus('err', 'That file is not a PDF. Choose a PDF lab report.');
+      return;
+    }
+
+    var token = CFG.EXTRACT_API_TOKEN;
+    var apiBase = CFG.EXTRACT_API_BASE || 'https://docextract.nomoi.ai';
+    if (!token) {
+      setLabStatus('err', 'The extraction service is not configured. Ask the NOMOI operator.');
+      return;
+    }
+
+    var patientId = current.id;
+    var storagePath = patientId + '/' + Date.now() + '.pdf';
+
+    btn.disabled = true;
+    fileInput.disabled = true;
+    setLabStatus('working', 'Uploading the report...');
+
+    sb.storage.from(LABS_BUCKET).upload(storagePath, file, {
+      contentType: 'application/pdf',
+      upsert: false
+    })
+      .then(function (res) {
+        if (res.error) {
+          throw new Error('Upload failed. ' + (res.error.message || 'Check the storage bucket exists.'));
+        }
+        emit('lab_report_uploaded', { patient_id: patientId });
+        setLabStatus('working', 'Reading the report. This can take up to a minute...');
+
+        return fetch(apiBase.replace(/\/+$/, '') + '/extract/labs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            patient_id: patientId,
+            storage_bucket: LABS_BUCKET,
+            storage_path: storagePath
+          })
+        });
+      })
+      .then(function (resp) {
+        // Read the body once, then branch on status, so a 422 with a JSON
+        // error message and a 200 with a result are both handled cleanly.
+        return resp.text().then(function (text) {
+          var body = null;
+          try { body = text ? JSON.parse(text) : null; } catch (e) { body = null; }
+          if (!resp.ok) {
+            var detail = (body && (body.error || body.message)) ||
+              text || ('HTTP ' + resp.status);
+            throw new Error('Could not read the report. ' + detail);
+          }
+          return body || {};
+        });
+      })
+      .then(function (result) {
+        emit('lab_report_extracted', {
+          patient_id: patientId,
+          inserted: result.inserted || 0
+        });
+        var inserted = Number(result.inserted || 0);
+        if (inserted > 0) {
+          setLabStatus('done', 'Done. ' + inserted + ' biomarker value' +
+            (inserted === 1 ? '' : 's') + ' read from the report.');
+        } else {
+          setLabStatus('done', 'Done. No biomarker values were found in that PDF.');
+        }
+        fileInput.value = '';
+        // The backend has written the rows; refresh this patient's view.
+        return loadBiomarkers(patientId).then(function () {
+          renderBiomarkers();
+          renderReport();
+        });
+      })
+      .catch(function (err) {
+        var msg = (err && err.message) ? err.message : String(err);
+        setLabStatus('err', msg);
+      })
+      .then(function () {
+        btn.disabled = false;
+        fileInput.disabled = false;
+      });
+  });
+
+  // Clear a stale status when a new file is chosen.
+  document.getElementById('labFile').addEventListener('change', clearLabStatus);
 
   /* ---- Cognitive Wellness score ------------------------------------- */
   function renderCognitive() {
