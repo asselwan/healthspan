@@ -31,9 +31,8 @@ window.__HEALTHSPAN_CONFIG = {
 
   // NOMOI document-extraction backend. The dashboard uploads a lab PDF to
   // Supabase Storage, then asks this service to read it and write the
-  // biomarker rows. The token below is acceptable in client config for v2
-  // because the dashboard is passcode-gated and clinician-only.
+  // biomarker rows. No secret is stored here: the call is authorised with
+  // the service-role key the clinician already entered at runtime.
   EXTRACT_API_BASE: 'https://docextract.nomoi.ai',
-  EXTRACT_API_TOKEN: 'b74e657206ee7c984d96b6de93362dce8a7024016542f253',
   LABS_BUCKET: 'healthspan-labs'
 };

@@ -51,6 +51,7 @@
   var pv = document.getElementById('pv');
 
   var sb = null;
+  var svcKey = null; // service-role key entered at unlock; also authorises extraction calls
   var patients = [];
   var current = null;   // current patient object
   var rounds = [];      // rounds for current patient
@@ -81,6 +82,7 @@
         db: { schema: CFG.SCHEMA || 'public' },
         auth: { persistSession: false }
       });
+      svcKey = key;
     } catch (e) {
       return showGateErr('Could not start the client. Check the read key.');
     }
@@ -638,10 +640,10 @@
       return;
     }
 
-    var token = CFG.EXTRACT_API_TOKEN;
+    var token = svcKey;
     var apiBase = CFG.EXTRACT_API_BASE || 'https://docextract.nomoi.ai';
     if (!token) {
-      setLabStatus('err', 'The extraction service is not configured. Ask the NOMOI operator.');
+      setLabStatus('err', 'Unlock the dashboard before uploading a lab report.');
       return;
     }
 
