@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Healthspan — Clinician dashboard</title>
+  <meta name="description" content="The longitudinal healthspan layer. Track readiness scores, lab biomarkers, and cognition over time." />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" type="image/png" href="https://nomoi.ai/nomoi-logo-120.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0c0a08; --bg-2: #161411; --bg-3: #1e1b16;
+      --fg: #f4f1ea; --fg-2: #d8d3c7;
+      --muted: rgba(244,241,234,0.55); --faint: rgba(244,241,234,0.30);
+      --gold: #c4976b; --gold-2: #d8b48b; --teal: #5bbfab;
+      --rule: rgba(196,151,107,0.20); --rule-soft: rgba(244,241,234,0.09);
+      --err: #e08c7d; --field-bg: #1a1713;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--fg);
+      font-family: 'Inter', system-ui, sans-serif; font-weight: 300;
+      line-height: 1.55; -webkit-font-smoothing: antialiased; min-height: 100vh;
+    }
+    .mono { font-family: 'DM Mono', ui-monospace, monospace; }
+    .serif { font-family: 'Instrument Serif', Georgia, serif; }
+    button, input, textarea, select { font-family: inherit; }
+    a { color: var(--gold-2); }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+    header.bar {
+      border-bottom: 1px solid var(--rule-soft); background: rgba(12,10,8,0.85);
+    }
+    .bar-inner {
+      display: flex; align-items: center; justify-content: space-between; height: 58px;
+    }
+    .wordmark {
+      font-weight: 900; font-size: 14px; letter-spacing: 0.04em;
+      border: 1.5px solid var(--fg); border-radius: 3px; padding: 3px 7px;
+    }
+    .bar .tag {
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+    }
+
+    /* Gate */
+    .gate {
+      max-width: 430px; margin: 64px auto 0;
+      background: var(--bg-2); border: 1px solid var(--rule);
+      border-radius: 12px; padding: 28px 26px;
+    }
+    .gate h1 {
+      font-family: 'Instrument Serif', Georgia, serif; font-weight: 400;
+      font-size: 26px; margin-bottom: 6px;
+    }
+    .gate p { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .gate label {
+      display: block; font-size: 12px; color: var(--fg-2); margin: 14px 0 5px;
+    }
+    .gate input {
+      width: 100%; background: var(--bg-3); border: 1px solid var(--rule);
+      border-radius: 7px; padding: 10px 11px; font-size: 14px; color: var(--fg);
+    }
+    .gate input:focus { outline: none; border-color: var(--gold); }
+    .gate .keyhint { font-size: 11px; color: var(--faint); margin-top: 4px; }
+    .gate button {
+      width: 100%; margin-top: 18px; background: var(--gold); color: var(--bg);
+      border: none; border-radius: 7px; padding: 11px;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+    }
+    .gate button:hover { background: var(--gold-2); }
+    .gate-err { display: none; margin-top: 12px; font-size: 12.5px; color: var(--err); }
+
+    /* Dashboard shell */
+    .dash { display: none; padding: 26px 0 70px; }
+    .dash.show { display: block; }
+    .dash-head { margin-bottom: 18px; }
+    .dash-head h1 {
+      font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 30px;
+    }
+    .dash-head .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    /* Patient bar */
+    .patient-bar {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+      background: var(--bg-2); border: 1px solid var(--rule);
+      border-radius: 11px; padding: 14px 16px; margin-bottom: 20px;
+    }
+    .pb-field { display: flex; flex-direction: column; gap: 4px; }
+    .pb-field label {
+      font-family: 'DM Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
+    }
+    .patient-bar select, .patient-bar input {
+      background: var(--bg-3); border: 1px solid var(--rule);
+      border-radius: 7px; padding: 8px 10px; font-size: 13px; color: var(--fg);
+    }
+    .patient-bar select { min-width: 220px; }
+    .patient-bar select:focus, .patient-bar input:focus {
+      outline: none; border-color: var(--gold);
+    }
+    .patient-bar .grow { flex: 1; min-width: 120px; }
+    .btn {
+      background: var(--bg-3); border: 1px solid var(--rule); color: var(--fg-2);
+      border-radius: 7px; padding: 8px 13px; font-size: 12.5px; cursor: pointer;
+      transition: border-color 0.14s, color 0.14s, background 0.14s;
+    }
+    .btn:hover { border-color: var(--gold); color: var(--fg); }
+    .btn-gold { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+    .btn-gold:hover { background: var(--gold-2); color: var(--bg); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* New patient inline form */
+    .new-patient {
+      display: none; background: var(--bg-2); border: 1px solid var(--rule);
+      border-radius: 11px; padding: 16px; margin-bottom: 20px;
+    }
+    .new-patient.show { display: block; }
+    .np-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .np-grid .f label {
+      display: block; font-family: 'DM Mono', monospace; font-size: 10px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 4px;
+    }
+    .np-grid .f input, .np-grid .f select {
+      width: 100%; background: var(--bg-3); border: 1px solid var(--rule);
+      border-radius: 7px; padding: 8px 10px; font-size: 13px; color: var(--fg);
+    }
+    .np-grid .f input:focus, .np-grid .f select:focus {
+      outline: none; border-color: var(--gold);
+    }
+    .np-actions { margin-top: 12px; display: flex; gap: 8px; }
+    .np-err { color: var(--err); font-size: 12px; margin-top: 8px; display: none; }
+
+    /* Empty / loading states */
+    .state {
+      text-align: center; padding: 56px 20px; color: var(--muted); font-size: 14px;
+      background: var(--bg-2); border: 1px solid var(--rule); border-radius: 11px;
+    }
+    .state.err { color: var(--err); }
+
+    /* Patient view */
+    .pv { display: none; }
+    .pv.show { display: block; }
+    .pv-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      flex-wrap: wrap; gap: 8px; margin-bottom: 4px;
+    }
+    .pv-head h2 {
+      font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 26px;
+    }
+    .pv-meta { font-size: 12.5px; color: var(--muted); margin-bottom: 18px; }
+
+    .grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+    }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--bg-2); border: 1px solid var(--rule);
+      border-radius: 11px; padding: 18px 18px 16px;
+    }
+    .card.full { grid-column: 1 / -1; }
+    .card h3 {
+      font-family: 'DM Mono', monospace; font-size: 10.5px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-2);
+      margin-bottom: 4px;
+    }
+    .card .ch-sub { font-size: 11.5px; color: var(--muted); margin-bottom: 12px; }
+
+    /* Big readiness number */
+    .latest {
+      display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px;
+    }
+    .latest .big {
+      font-family: 'Instrument Serif', Georgia, serif; font-weight: 400;
+      font-size: 52px; line-height: 1; color: var(--fg);
+    }
+    .latest .of { font-size: 13px; color: var(--faint); }
+    .latest .delta { font-family: 'DM Mono', monospace; font-size: 12px; }
+    .delta.up { color: var(--teal); }
+    .delta.down { color: var(--err); }
+    .delta.flat { color: var(--muted); }
+    .latest-band {
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold-2);
+    }
+
+    /* Chart */
+    .chart-host { width: 100%; overflow: hidden; }
+    .chart-host svg { display: block; width: 100%; height: auto; }
+    .chart-empty {
+      font-size: 12.5px; color: var(--faint); padding: 24px 0; text-align: center;
+    }
+    .legend {
+      display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px;
+      font-size: 11px; color: var(--muted);
+    }
+    .legend i {
+      display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+      margin-right: 5px; vertical-align: -1px;
+    }
+
+    /* Rounds table */
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left; font-family: 'DM Mono', monospace; font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
+      padding: 7px 10px; border-bottom: 1px solid var(--rule);
+    }
+    tbody td {
+      padding: 10px; font-size: 12.5px; color: var(--fg-2);
+      border-bottom: 1px solid var(--rule-soft); vertical-align: top;
+    }
+    tbody td.score-cell { color: var(--fg); font-weight: 500; }
+
+    /* Biomarker entry */
+    .bm-form {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px; align-items: end; margin-bottom: 14px;
+    }
+    .bm-form .f label {
+      display: block; font-family: 'DM Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 4px;
+    }
+    .bm-form .f input, .bm-form .f select {
+      width: 100%; background: var(--bg-3); border: 1px solid var(--rule);
+      border-radius: 7px; padding: 8px 9px; font-size: 12.5px; color: var(--fg);
+    }
+    .bm-form .f input:focus, .bm-form .f select:focus {
+      outline: none; border-color: var(--gold);
+    }
+    .bm-err { color: var(--err); font-size: 12px; margin-bottom: 8px; display: none; }
+    .bm-ok { color: var(--teal); font-size: 12px; margin-bottom: 8px; display: none; }
+
+    .marker-block { margin-bottom: 18px; }
+    .marker-block:last-child { margin-bottom: 0; }
+    .marker-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .marker-head .mh-name { font-size: 13px; color: var(--fg); }
+    .marker-head .mh-latest {
+      font-family: 'DM Mono', monospace; font-size: 12px; color: var(--gold-2);
+    }
+
+    /* Cognitive wellness */
+    .cw-row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .cw-row .f { flex: 1; min-width: 110px; }
+    .cw-row .f label {
+      display: block; font-family: 'DM Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 4px;
+    }
+    .cw-row .f input {
+      width: 100%; background: var(--bg-3); border: 1px solid var(--rule);
+      border-radius: 7px; padding: 8px 9px; font-size: 12.5px; color: var(--fg);
+    }
+    .cw-row .f input:focus { outline: none; border-color: var(--gold); }
+    .cw-current {
+      font-size: 12.5px; color: var(--muted); margin-bottom: 10px;
+    }
+    .cw-current b {
+      font-family: 'Instrument Serif', Georgia, serif; font-weight: 400;
+      font-size: 22px; color: var(--fg);
+    }
+
+    /* Patient summary / report */
+    .report {
+      background: var(--bg-2); border: 1px solid var(--rule);
+      border-radius: 11px; padding: 0; margin-bottom: 16px; overflow: hidden;
+    }
+    .report-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 18px; cursor: pointer;
+      border-bottom: 1px solid transparent;
+    }
+    .report.open .report-head { border-bottom-color: var(--rule-soft); }
+    .report-head h3 {
+      font-family: 'DM Mono', monospace; font-size: 10.5px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-2);
+    }
+    .report-head .toggle { font-size: 12px; color: var(--muted); }
+    .report-body { display: none; padding: 18px; }
+    .report.open .report-body { display: block; }
+    .report-body .r-title {
+      font-family: 'Instrument Serif', Georgia, serif; font-size: 24px;
+      margin-bottom: 2px;
+    }
+    .report-body .r-date { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+    .report-body p { font-size: 13.5px; color: var(--fg-2); margin-bottom: 10px; }
+    .r-stats {
+      display: flex; gap: 22px; flex-wrap: wrap; margin: 14px 0;
+      padding: 14px 0; border-top: 1px solid var(--rule-soft);
+      border-bottom: 1px solid var(--rule-soft);
+    }
+    .r-stat .rs-num {
+      font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; color: var(--fg);
+    }
+    .r-stat .rs-label {
+      font-family: 'DM Mono', monospace; font-size: 9.5px;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+    }
+    .r-list { font-size: 13px; color: var(--fg-2); }
+    .r-list .chip {
+      display: inline-block; font-size: 11.5px; background: var(--bg-3);
+      border: 1px solid var(--rule); color: var(--fg-2);
+      border-radius: 999px; padding: 2px 9px; margin: 0 5px 5px 0;
+    }
+    .r-print {
+      margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule-soft);
+    }
+
+    [hidden] { display: none !important; }
+
+    @media print {
+      header.bar, .patient-bar, .new-patient, .toolbar,
+      .card.full.entry, .bm-form, .cw-row, .report-head .toggle { display: none !important; }
+      body { background: #fff; color: #111; }
+      .report-body { display: block !important; }
+    }
+  </style>
+</head>
+<body data-nomoi-surface="healthspan.nomoi.ai">
+
+  <header class="bar">
+    <div class="wrap bar-inner">
+      <span class="wordmark" aria-label="NOMOI">NOMΘI</span>
+      <span class="tag">Healthspan · Clinician dashboard</span>
+    </div>
+  </header>
+
+  <!-- Gate -->
+  <div class="gate" id="gate">
+    <h1>Clinician dashboard</h1>
+    <p>The longitudinal healthspan layer. Enter the shared passcode and a read key to open it.</p>
+
+    <label for="passInput">Passcode</label>
+    <input type="password" id="passInput" autocomplete="off" placeholder="Shared dashboard passcode" />
+
+    <label for="keyInput">Read key</label>
+    <input type="password" id="keyInput" autocomplete="off" placeholder="Supabase service-role key" />
+    <div class="keyhint">
+      Patient records are private. The key is held only in this browser tab and is
+      never written into the page or any storage. Ask the NOMOI operator for it.
+    </div>
+
+    <button id="enterBtn">Open dashboard</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dash" id="dash">
+    <div class="wrap">
+      <div class="dash-head">
+        <h1>Healthspan</h1>
+        <div class="sub">Readiness rounds, lab biomarkers, and cognition tracked over time. Part of the deegha.health combo.</div>
+      </div>
+
+      <!-- Patient picker -->
+      <div class="patient-bar">
+        <div class="pb-field grow">
+          <label for="patientSelect">Patient</label>
+          <select id="patientSelect"><option value="">Loading patients...</option></select>
+        </div>
+        <button class="btn" id="newPatientBtn">Add patient</button>
+        <button class="btn" id="reloadBtn">Refresh</button>
+      </div>
+
+      <!-- New patient inline form -->
+      <div class="new-patient" id="newPatient">
+        <div class="np-grid">
+          <div class="f"><label>Full name</label><input type="text" id="npName" placeholder="Patient name" /></div>
+          <div class="f"><label>Date of birth</label><input type="date" id="npDob" /></div>
+          <div class="f"><label>Sex</label>
+            <select id="npSex">
+              <option value="">Not set</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="other">Other</option>
+              <option value="undisclosed">Undisclosed</option>
+            </select>
+          </div>
+          <div class="f"><label>Email</label><input type="email" id="npEmail" placeholder="optional" /></div>
+          <div class="f"><label>Phone</label><input type="tel" id="npPhone" placeholder="optional" /></div>
+        </div>
+        <div class="np-actions">
+          <button class="btn btn-gold" id="npSave">Save patient</button>
+          <button class="btn" id="npCancel">Cancel</button>
+        </div>
+        <div class="np-err" id="npErr"></div>
+      </div>
+
+      <div id="viewHost">
+        <div class="state" id="pickState">Select a patient, or add one, to see their longitudinal view.</div>
+      </div>
+
+      <!-- Patient view -->
+      <div class="pv" id="pv">
+
+        <div class="pv-head">
+          <h2 id="pvName"></h2>
+        </div>
+        <div class="pv-meta" id="pvMeta"></div>
+
+        <div class="grid">
+          <!-- Readiness summary -->
+          <div class="card">
+            <h3>Healthspan readiness</h3>
+            <div class="ch-sub">Latest intake round and direction of travel.</div>
+            <div class="latest" id="readinessLatest"></div>
+            <div class="latest-band" id="readinessBand"></div>
+          </div>
+          <!-- Cognitive wellness -->
+          <div class="card">
+            <h3>Cognitive Wellness score</h3>
+            <div class="ch-sub">From the NOMOI Cognitive Wellness tier of the combo.</div>
+            <div class="cw-current" id="cwCurrent">Not recorded yet.</div>
+            <div class="cw-row">
+              <div class="f"><label>Score 0 to 100</label><input type="number" id="cwScore" min="0" max="100" step="0.1" placeholder="e.g. 72" /></div>
+              <div class="f"><label>Dated</label><input type="date" id="cwDate" /></div>
+              <button class="btn btn-gold" id="cwSave">Save</button>
+            </div>
+            <div class="bm-err" id="cwErr"></div>
+            <div class="bm-ok" id="cwOk">Saved.</div>
+          </div>
+        </div>
+
+        <!-- Readiness trend chart -->
+        <div class="card full">
+          <h3>Readiness over time</h3>
+          <div class="ch-sub">Every intake round's readiness score. The intake is built to be re-taken.</div>
+          <div class="chart-host" id="readinessChart"></div>
+        </div>
+
+        <!-- Rounds table -->
+        <div class="card full">
+          <h3>Intake rounds</h3>
+          <div class="ch-sub">Each dated round and the score it produced.</div>
+          <div id="roundsTable"></div>
+        </div>
+
+        <!-- Biomarker entry -->
+        <div class="card full entry">
+          <h3>Add a lab biomarker</h3>
+          <div class="ch-sub">Enter a dated lab value. v1 is structured entry; automatic lab-report reading is on the roadmap.</div>
+          <div class="bm-form">
+            <div class="f">
+              <label>Marker</label>
+              <select id="bmMarker"></select>
+            </div>
+            <div class="f"><label>Value</label><input type="number" id="bmValue" step="0.001" placeholder="value" /></div>
+            <div class="f"><label>Unit</label><input type="text" id="bmUnit" placeholder="unit" /></div>
+            <div class="f"><label>Sampled on</label><input type="date" id="bmDate" /></div>
+            <button class="btn btn-gold" id="bmSave">Add value</button>
+          </div>
+          <div class="bm-err" id="bmErr"></div>
+          <div class="bm-ok" id="bmOk">Value added.</div>
+        </div>
+
+        <!-- Biomarker charts -->
+        <div class="card full">
+          <h3>Biomarker trends</h3>
+          <div class="ch-sub">One trend line per tracked marker.</div>
+          <div id="biomarkerCharts"></div>
+        </div>
+
+        <!-- Patient summary / report -->
+        <div class="report" id="report">
+          <div class="report-head" id="reportHead">
+            <h3>Patient healthspan summary</h3>
+            <span class="toggle" id="reportToggle">Show</span>
+          </div>
+          <div class="report-body" id="reportBody"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- NOMOI Surface emitter -->
+  <script>
+  (function(){if(window.__nomoiSurfaceEmit)return;var s='healthspan.nomoi.ai',e='https://ingest.atlas.nomoi.ai/api/surface/ingest',k='__nomoi_surface_session';var id;try{id=sessionStorage.getItem(k)||crypto.randomUUID();sessionStorage.setItem(k,id)}catch(_){id=crypto.randomUUID()}function send(t,p){var b=JSON.stringify({surface:s,event:t,payload:p,ts:new Date().toISOString(),session_id:id});var bl=new Blob([b],{type:'application/json'});if(navigator.sendBeacon)navigator.sendBeacon(e,bl);else fetch(e,{method:'POST',body:bl,keepalive:true}).catch(function(){})}window.__nomoiSurfaceEmit=send;window.__nomoiSurfaceSessionId=id;send('page_view',{path:location.pathname})})();
+  </script>
+
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="dashboard.js"></script>
+  <script src="https://ingest.atlas.nomoi.ai/lib/surface-motion.js" defer></script>
+</body>
+</html>
