@@ -683,7 +683,7 @@
           var body = null;
           try { body = text ? JSON.parse(text) : null; } catch (e) { body = null; }
           if (!resp.ok) {
-            var detail = (body && (body.error || body.message)) ||
+            var detail = (body && (body.detail || body.error || body.message)) ||
               text || ('HTTP ' + resp.status);
             throw new Error('Could not read the report. ' + detail);
           }
